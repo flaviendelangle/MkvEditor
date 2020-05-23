@@ -1,0 +1,42 @@
+{
+  "name": "@delangle/mkv-editor",
+  "version": "0.0.1",
+  "description": "Tools to edit batch of mkv files with mkvtoolnix",
+  "scripts": {
+    "clean": "rimraf ./dist",
+    "mkv": "ts-node src/mkv_editor.ts",
+    "build": "npm run clean && tsc",
+    "build:watch": "npm run clean && tsc --watch",
+    "lint": "eslint \"src/**\"",
+    "start": "node ./dist/index.js"
+  },
+  "author": "Flavien DELANGLE",
+  "license": "GNU",
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix"
+    ]
+  },
+  "dependencies": {
+    "commander": "^5.1.0",
+    "inquirer": "^7.1.0",
+    "lodash": "^4.17.15",
+    "opensubtitles-api": "^5.1.2"
+  },
+  "devDependencies": {
+    "@habx/eslint-config-client": "^3.1.0",
+    "@types/inquirer": "^6.5.0",
+    "@types/lodash": "^4.14.152",
+    "@types/node": "^13.13.4",
+    "husky": "^4.2.5",
+    "lint-staged": "^10.2.6",
+    "rimraf": "^3.0.2",
+    "ts-node": "^8.10.1",
+    "typescript": "^3.8.3"
+  }
+}
