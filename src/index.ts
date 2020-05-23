@@ -60,10 +60,10 @@ program
   .arguments('<cdm> [en]')
   .option('-v, --verbose', 'Verbose mode')
   .option('-d, --debug', 'Debug mode')
-  .option('-b --batch', 'Batch mode (execute all heavy queries')
+  .option('-b --batch', 'Batch mode (execute all heavy queries)')
   .option(
     '-s, --scripts <type>',
-    `Script to run (${Object.values(MkvEditorScript).join(', ')})`
+    `Script(s) to run (${Object.values(MkvEditorScript).join(', ')})`
   )
   .action((cmd) => {
     root = cmd
