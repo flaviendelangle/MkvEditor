@@ -8,8 +8,7 @@ export enum MkvEditorScript {
   addMissingLanguages = 'add-missing-languages',
   promptDefaultAudioLanguage = 'prompt-default-audio-language',
   setDefaultSubtitle = 'set-default-subtitle',
-  updateContainerTitle = 'update-container-title',
-  addYearToFileName = 'add-year-to-file-name',
+  sanitizeTitle = 'sanitize-title',
   removeUselessAudioTracks = 'remove-useless-audio-tracks',
   extractSubtitles = 'extract-subtitles',
 }

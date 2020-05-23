@@ -11,9 +11,6 @@ const SCRIPT_CONFIGS: Record<MkvEditorScript, ScriptConfig> = {
   [MkvEditorScript.addMissingLanguages]: {
     isRunByDefault: true,
   },
-  [MkvEditorScript.addYearToFileName]: {
-    isRunByDefault: true,
-  },
   [MkvEditorScript.addMissingLanguages]: {
     isRunByDefault: true,
   },
@@ -23,7 +20,7 @@ const SCRIPT_CONFIGS: Record<MkvEditorScript, ScriptConfig> = {
   [MkvEditorScript.removeUselessAudioTracks]: {
     isRunByDefault: false,
   },
-  [MkvEditorScript.updateContainerTitle]: {
+  [MkvEditorScript.sanitizeTitle]: {
     isRunByDefault: true,
   },
   [MkvEditorScript.setDefaultSubtitle]: {

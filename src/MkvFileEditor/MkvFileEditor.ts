@@ -1,3 +1,4 @@
+import { filenameParse } from '@ctrl/video-filename-parser'
 import { exec } from 'child_process'
 import { promises as fs } from 'fs'
 import inquirer from 'inquirer'
@@ -10,12 +11,13 @@ import {
   MkvEditorScript,
   Track,
 } from '../typings'
+import { removeExtensionFromFileName } from '../utils'
 
 import { DEFAULT_MKV_DETAILS, TRACK_TYPE_CONFIGS } from './MkvFileEditor.config'
 
 class MkvFileEditor {
   private static CACHE_FOLDER = '.mkv_cache'
-  private static FILE_TITLE_REGEXP = /(.*) \(([0-9]{4})\)\.mkv/
+  private static FILE_TITLE_REGEXP = /^([^(]+) \(([0-9]{4})\)$/
 
   private filePath: string
   private readonly config: MkvEditorConfig
@@ -37,7 +39,7 @@ class MkvFileEditor {
   }
 
   get fileNameWithoutExtension() {
-    return this.fileName.split('.').slice(0, -1).join('.')
+    return removeExtensionFromFileName(this.fileName)
   }
 
   get fileDirectory() {
@@ -130,12 +132,8 @@ class MkvFileEditor {
       await this.removeUselessAudioTracks()
     }
 
-    if (this.config.scripts[MkvEditorScript.addYearToFileName]) {
-      await this.addYearToFileName()
-    }
-
-    if (this.config.scripts[MkvEditorScript.updateContainerTitle]) {
-      await this.updateTitle()
+    if (this.config.scripts[MkvEditorScript.sanitizeTitle]) {
+      await this.sanitizeTitle()
     }
 
     if (this.config.scripts[MkvEditorScript.extractSubtitles]) {
@@ -181,7 +179,7 @@ class MkvFileEditor {
 
         if (language) {
           await this.execQuery(
-            `mkvpropedit "${this.mkvDetails.file_name}" --edit track:@${properties.number} --set language=${language}`
+            `mkvpropedit "${this.filePath}" --edit track:@${properties.number} --set language=${language}`
           )
           this.log('Track updated', true)
         } else {
@@ -303,47 +301,57 @@ class MkvFileEditor {
     }
   }
 
-  private async addYearToFileName() {
-    const match = MkvFileEditor.FILE_TITLE_REGEXP.exec(this.fileName)
+  private async sanitizeTitle() {
+    const titleMatch = MkvFileEditor.FILE_TITLE_REGEXP.exec(
+      this.fileNameWithoutExtension
+    )
 
-    if (!match) {
-      const { year } = await inquirer.prompt<{ year: string }>([
+    if (!titleMatch) {
+      const fileInfo = filenameParse(this.fileName)
+
+      const { title, year } = await inquirer.prompt<{
+        year: string
+        title: string
+      }>([
+        {
+          name: 'title',
+          message: `Title of ${this.fileName}`,
+          default: fileInfo.title
+            ? removeExtensionFromFileName(fileInfo.title).trim()
+            : '',
+        },
         {
           name: 'year',
           message: `Release year of ${this.fileName} :`,
+          year: fileInfo.year,
         },
       ])
 
-      if (year) {
-        const newFileName = `${this.fileNameWithoutExtension} (${year}).mkv`
+      if (!year || !title) {
+        this.log('Missing informations', true)
+        await this.sanitizeTitle()
+      } else {
+        const newFileName = `${title} (${year}).mkv`
 
         const newFilePath = path.join(this.fileDirectory, newFileName)
 
-        this.log(`Rename file ${this.fileName} => ${newFileName}`)
-        await fs.rename(this.mkvDetails.file_name, newFilePath)
-
+        await fs.rename(this.filePath, newFilePath)
         this.filePath = newFilePath
+        this.log(`File renamed: ${this.fileName} => ${newFileName}`, true)
+
+        const containerTitle = this.mkvDetails.container.properties.title
+        if (title !== containerTitle) {
+          await this.execQuery(
+            `mkvpropedit "${this.filePath}" --edit info --set "title=${title}"`
+          )
+          this.log(
+            `Container title updated: ${containerTitle} => ${title}`,
+            true
+          )
+        }
+
         await this.fetchFileDetails()
       }
-    }
-  }
-
-  private async updateTitle() {
-    const currentTitle = this.mkvDetails.container.properties.title
-
-    const match = MkvFileEditor.FILE_TITLE_REGEXP.exec(this.fileName)
-
-    if (match) {
-      const newTitle = match[1]
-
-      if (newTitle !== currentTitle) {
-        this.log(`Update title ${currentTitle} => ${newTitle}`)
-        await this.execQuery(
-          `mkvpropedit "${this.mkvDetails.file_name}" --edit info --set "title=${newTitle}"`
-        )
-      }
-    } else {
-      this.log('Cannot parse file name')
     }
   }
 
@@ -397,9 +405,7 @@ class MkvFileEditor {
       )
       .join(' ')
 
-    await this.execQuery(
-      `mkvpropedit "${this.mkvDetails.file_name}" ${tracksCommand}`
-    )
+    await this.execQuery(`mkvpropedit "${this.filePath}" ${tracksCommand}`)
     await this.fetchFileDetails()
 
     this.log(
