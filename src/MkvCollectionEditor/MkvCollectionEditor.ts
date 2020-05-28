@@ -1,16 +1,25 @@
 import { promises as fs } from 'fs'
 import path from 'path'
 
+import CacheManager from '../CacheManager'
 import MkvFileEditor from '../MkvFileEditor'
-import { MkvEditorConfig } from '../typings'
+import PlexDatabase from '../PlexDatabase'
+import { CliConfig } from '../typings'
 
 class MkvCollectionEditor {
+  private static PLEX_DB_ENABLED = false
+
   private readonly root: string
-  private readonly config: MkvEditorConfig
+  private readonly config: CliConfig
+
+  private readonly cache: CacheManager = new CacheManager()
+  private readonly plexDB: PlexDatabase = new PlexDatabase({
+    cache: this.cache,
+  })
 
   private fileEditors: MkvFileEditor[] = []
 
-  constructor(root: string, config: MkvEditorConfig) {
+  constructor(root: string, config: CliConfig) {
     this.root = root
     this.config = config
   }
@@ -28,15 +37,21 @@ class MkvCollectionEditor {
    * Runners
    */
   public async run() {
+    await this.cache.fetchConfig()
+
+    if (MkvCollectionEditor.PLEX_DB_ENABLED) {
+      await this.plexDB.connect()
+    }
+
     this.checkConfigValidity()
 
     this.log(
-      `Running MkvEditor with the following script: ${Object.entries(
+      `Running MkvEditor with the following script:\n${Object.entries(
         this.config.scripts
       )
         .filter(([, active]) => active)
         .map(([script]) => `- ${script}`)
-        .join('\n')}\n\n`,
+        .join('\n')}\n`,
       true
     )
 
@@ -60,7 +75,11 @@ class MkvCollectionEditor {
 
   private async runFile(filePath: string) {
     try {
-      const fileEditor = new MkvFileEditor(filePath, this.config)
+      const fileEditor = new MkvFileEditor({
+        filePath,
+        config: this.config,
+        cache: this.cache,
+      })
       await fileEditor.run()
 
       if (this.config.batch) {

@@ -4,8 +4,9 @@ import { promises as fs } from 'fs'
 import inquirer from 'inquirer'
 import path from 'path'
 
+import CacheManager from '../CacheManager'
 import {
-  MkvEditorConfig,
+  CliConfig,
   MkvDetails,
   TrackTypes,
   MkvEditorScript,
@@ -15,20 +16,28 @@ import { removeExtensionFromFileName } from '../utils'
 
 import { DEFAULT_MKV_DETAILS, TRACK_TYPE_CONFIGS } from './MkvFileEditor.config'
 
+type MkvFileEditorParams = {
+  filePath: string
+  config: CliConfig
+  cache?: CacheManager
+}
+
 class MkvFileEditor {
-  private static CACHE_FOLDER = '.mkv_cache'
   private static FILE_TITLE_REGEXP = /^([^(]+) \(([0-9]{4})\)$/
 
   private filePath: string
-  private readonly config: MkvEditorConfig
+  private readonly config: CliConfig
 
   private mkvDetails: MkvDetails = DEFAULT_MKV_DETAILS
 
   private batchedActions: (() => Promise<void>)[] = []
 
-  constructor(filePath: string, config: MkvEditorConfig) {
-    this.filePath = filePath
-    this.config = config
+  private readonly cache: CacheManager
+
+  constructor(params: MkvFileEditorParams) {
+    this.filePath = params.filePath
+    this.config = params.config
+    this.cache = params.cache ?? new CacheManager()
   }
 
   /**
@@ -54,7 +63,7 @@ class MkvFileEditor {
 
   get audioTracks() {
     return this.mkvDetails.tracks.filter(
-      (track) => track.type === TrackTypes.subtitles
+      (track) => track.type === TrackTypes.audio
     )
   }
 
@@ -63,7 +72,10 @@ class MkvFileEditor {
    */
   private log(message: string, forced: boolean = false) {
     if (this.config.verbose || forced) {
-      console.log(message) // eslint-disable-line no-console
+      const prefix = this.config.verbose
+        ? ''
+        : `${this.fileNameWithoutExtension} `
+      console.log(`${prefix} ${message}`) // eslint-disable-line no-console
     }
   }
 
@@ -98,19 +110,15 @@ class MkvFileEditor {
    * Runners
    */
   public async run() {
-    this.log(`\nRun ${this.fileName}`)
+    this.log(`\nProcess ${this.fileName}`)
 
     await this.fetchFileDetails()
 
-    if (this.config.debug) {
-      try {
-        await fs.access(MkvFileEditor.CACHE_FOLDER)
-      } catch {
-        return fs.mkdir(MkvFileEditor.CACHE_FOLDER)
-      }
+    await this.cache.fetchConfig()
 
-      await fs.writeFile(
-        `${path.join(MkvFileEditor.CACHE_FOLDER, this.fileName)}.txt`,
+    if (this.config.debug) {
+      await this.cache.upsertFile(
+        `${this.fileName}.txt`,
         JSON.stringify(this.mkvDetails, null, 2)
       )
     }
@@ -338,24 +346,35 @@ class MkvFileEditor {
         await fs.rename(this.filePath, newFilePath)
         this.filePath = newFilePath
         this.log(`File renamed: ${this.fileName} => ${newFileName}`, true)
-
-        const containerTitle = this.mkvDetails.container.properties.title
-        if (title !== containerTitle) {
-          await this.execQuery(
-            `mkvpropedit "${this.filePath}" --edit info --set "title=${title}"`
-          )
-          this.log(
-            `Container title updated: ${containerTitle} => ${title}`,
-            true
-          )
-        }
-
-        await this.fetchFileDetails()
       }
     }
+
+    const newTitleMatch = MkvFileEditor.FILE_TITLE_REGEXP.exec(
+      this.fileNameWithoutExtension
+    )
+
+    if (!newTitleMatch) {
+      this.log('Something went wrong', true)
+    } else {
+      const containerTitle = this.mkvDetails.container.properties.title
+      const newTitle = newTitleMatch[1]
+
+      if (newTitle !== containerTitle) {
+        await this.execQuery(
+          `mkvpropedit "${this.filePath}" --edit info --set "title=${newTitle}"`
+        )
+        this.log(
+          `Container title updated: ${containerTitle} => ${newTitle}`,
+          true
+        )
+      }
+    }
+
+    await this.fetchFileDetails()
   }
 
   private async extractSubtitles() {
+    /*
     const subtitleTracks = this.subtitleTracks
 
     if (!subtitleTracks.length) {
@@ -390,6 +409,7 @@ class MkvFileEditor {
       this.log('Invalid track index', true)
       await this.extractSubtitles()
     }
+    */
   }
 
   /**
@@ -409,7 +429,8 @@ class MkvFileEditor {
     await this.fetchFileDetails()
 
     this.log(
-      `New default ${defaultTrack.type} : ${defaultTrack.properties.language}`
+      `New default ${defaultTrack.type} : ${defaultTrack.properties.language}`,
+      true
     )
   }
 

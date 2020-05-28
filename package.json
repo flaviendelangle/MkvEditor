@@ -7,7 +7,7 @@
     "build": "npm run clean && tsc",
     "build:watch": "npm run clean && tsc --watch",
     "lint": "eslint \"src/**\"",
-    "start": "node ./dist/index.js"
+    "start": "node ./dist/cli.js"
   },
   "author": "Flavien DELANGLE",
   "license": "GNU",
@@ -25,13 +25,15 @@
     "@ctrl/video-filename-parser": "^1.6.5",
     "commander": "^5.1.0",
     "inquirer": "^7.1.0",
-    "lodash": "^4.17.15"
+    "lodash": "^4.17.15",
+    "sqlite3": "^4.2.0"
   },
   "devDependencies": {
     "@habx/eslint-config-client": "^3.1.0",
     "@types/inquirer": "^6.5.0",
     "@types/lodash": "^4.14.152",
     "@types/node": "^13.13.4",
+    "@types/sqlite3": "^3.1.6",
     "husky": "^4.2.5",
     "lint-staged": "^10.2.6",
     "rimraf": "^3.0.2",

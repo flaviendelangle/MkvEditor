@@ -1,7 +1,7 @@
 import commander from 'commander'
 
 import MkvCollectionEditor from './MkvCollectionEditor'
-import { MkvEditorConfig, MkvEditorScript } from './typings'
+import { CliConfig, MkvEditorScript } from './typings'
 
 type ScriptConfig = {
   isRunByDefault: boolean
@@ -14,17 +14,17 @@ const SCRIPT_CONFIGS: Record<MkvEditorScript, ScriptConfig> = {
   [MkvEditorScript.addMissingLanguages]: {
     isRunByDefault: true,
   },
-  [MkvEditorScript.promptDefaultAudioLanguage]: {
-    isRunByDefault: true,
-  },
-  [MkvEditorScript.removeUselessAudioTracks]: {
-    isRunByDefault: false,
-  },
   [MkvEditorScript.sanitizeTitle]: {
     isRunByDefault: true,
   },
   [MkvEditorScript.setDefaultSubtitle]: {
     isRunByDefault: true,
+  },
+  [MkvEditorScript.promptDefaultAudioLanguage]: {
+    isRunByDefault: false,
+  },
+  [MkvEditorScript.removeUselessAudioTracks]: {
+    isRunByDefault: false,
   },
   [MkvEditorScript.extractSubtitles]: {
     isRunByDefault: false,
@@ -32,20 +32,29 @@ const SCRIPT_CONFIGS: Record<MkvEditorScript, ScriptConfig> = {
 }
 
 const run = async (root: string, command: commander.Command) => {
-  const config: MkvEditorConfig = {
+  const rawScripts = command.scripts || 'default'
+
+  let scripts: MkvEditorScript[]
+
+  if (rawScripts === 'all') {
+    scripts = Object.values(MkvEditorScript)
+  } else if (rawScripts === 'default') {
+    scripts = Object.values(MkvEditorScript).filter(
+      (script) => SCRIPT_CONFIGS[script]?.isRunByDefault
+    )
+  } else {
+    scripts = rawScripts
+      .split(',')
+      .map((script: string) => script.trim())
+      .filter((script: MkvEditorScript) => !!SCRIPT_CONFIGS[script])
+  }
+
+  const config: CliConfig = {
     verbose: command.verbose,
     debug: command.debug,
     batch: command.batch,
     scripts: Object.fromEntries(
-      (command.scripts
-        ? command.scripts
-            .split(',')
-            .map((script: string) => script.trim())
-            .filter((script: MkvEditorScript) => !!SCRIPT_CONFIGS[script])
-        : Object.values(MkvEditorScript).filter(
-            (script) => SCRIPT_CONFIGS[script]?.isRunByDefault
-          )
-      ).map((script: MkvEditorScript) => [script, true])
+      scripts.map((script: MkvEditorScript) => [script, true])
     ),
   }
 
@@ -63,7 +72,9 @@ program
   .option('-b --batch', 'Batch mode (execute all heavy queries)')
   .option(
     '-s, --scripts <type>',
-    `Script(s) to run (${Object.values(MkvEditorScript).join(', ')})`
+    `Script(s) to run (all, default, ${Object.values(MkvEditorScript).join(
+      ', '
+    )})`
   )
   .action((cmd) => {
     root = cmd

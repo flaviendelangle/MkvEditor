@@ -13,7 +13,7 @@ export enum MkvEditorScript {
   extractSubtitles = 'extract-subtitles',
 }
 
-export type MkvEditorConfig = {
+export type CliConfig = {
   verbose: boolean
   debug: boolean
   batch: boolean
@@ -46,4 +46,8 @@ export type MkvDetails = {
       title: string
     }
   }
+}
+
+export type GlobalConfig = {
+  plexFolder: string
 }
